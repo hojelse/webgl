@@ -6,15 +6,12 @@
 	<title>Document</title>
 </head>
 <body>
-	<canvas id="mycanvas"></canvas>
+	<canvas id="mycanvas" width="1000px" height="1000px"></canvas>
 	<script>
 		const canvas = document.querySelector("#mycanvas");
 		const gl = canvas.getContext('webgl') ||
 			canvas.getContext('experimental-webgl');
 		if (!gl) throw new Error('browser may not support webgl');
-
-		gl.clearColor(0.0, 0.0, 0.0, 1.0);
-		gl.clear(gl.COLOR_BUFFER_BIT);
 
 		const vertex_shader_src = `			\
 			attribute vec4 aPosition;		\
@@ -60,6 +57,77 @@
 
 			return program;
 		}
+
+		function initBuffer(gl, data, elemPerVertex, attribute) {
+			const buffer = gl.createBuffer();
+			if (!buffer) throw new Error("Failed to create buffer");
+			gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+			gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+			gl.vertexAttribPointer(attribute, elemPerVertex, gl.FLOAT, false, 0, 0);
+			return gl.enableVertexAttribArray(attribute);
+		}
+
+		function initBuffers(gl, attributes) {
+
+			const elemPerVertex = {
+				"aPosition": 2,
+				"aPointSize": 1,
+				"aColor": 3
+			}
+			const data = {
+				"aPosition": new Float32Array([
+					//     x,    y
+						0.0,  0.5,
+						-0.5, -0.5,
+						0.5, -0.5
+					]),
+				"aPointSize": new Float32Array([
+						10.0,
+						20.0,
+						30.0
+					]),
+				"aColor": new Float32Array([
+					//    r,   g,   b
+						1.0, 0.0, 0.0,
+						0.0, 1.0, 0.0,
+						0.0, 0.0, 1.0
+					])
+			}
+
+
+			for (const [attr, location] of Object.entries(attributes)) {
+				initBuffer(gl, data[attr], elemPerVertex[attr], location);
+			}
+
+			return 3;
+		}
+
+		function getAttributes(gl, program) {
+			const attributes = {}
+
+			const numAttributes = gl.getProgramParameter(program, gl.ACTIVE_ATTRIBUTES);
+			for (var i = 0; i < numAttributes; i++) {
+				const attId = gl.getActiveAttrib(program, i).name;
+				const aLoc = gl.getAttribLocation(program, attId);
+				attributes[attId] = aLoc;
+			}
+
+			return attributes
+		}
+
+		function getUniforms(gl, program) {
+			const uniforms = {}
+			
+			const numUniforms = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
+			for (var i = 0; i < numUniforms; i++) {
+				const uniId = gl.getActiveUniform(program, i).name;
+				const uLoc = gl.getUniformLocation(program, uniId);
+				uniforms[uniId] = uLoc;
+			}
+
+			return uniforms
+		}
+			
 		const program = link(
 				gl,
 				compile(gl, gl.VERTEX_SHADER, vertex_shader_src),
@@ -67,14 +135,15 @@
 			);
 
 		gl.useProgram(program);
+		gl.clearColor(0.0, 0.0, 0.0, 1.0);
+		gl.clear(gl.COLOR_BUFFER_BIT);
 
-		const aPosition = gl.getAttribLocation(program, 'aPosition');
-		const uFragColor = gl.getUniformLocation(program, 'uFragColor');
+		getAttributes(gl, program);
+		const attributes = getAttributes(gl, program);
+		const uniforms = getUniforms(gl, program);
+		const n = initBuffers(gl, attributes);
 
-		gl.vertexAttrib2f(aPosition, 0.0, 0.0);
-		gl.uniform4f(uFragColor, 1.0, 0.0, 0.0, 1.0);
-
-		gl.drawArrays(gl.POINTS, 0, 1); // minimize draw calls, they are expensive
+		gl.drawArrays(gl.POINTS, 0, n); // minimize draw calls, they are expensive
 
 	</script>
 </body>
